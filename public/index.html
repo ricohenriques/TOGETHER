@@ -445,10 +445,11 @@
     
     <script>
         // Configuration - UPDATE THIS URL TO YOUR DEPLOYED SERVER
-       const SERVER_URL = 'wss://together-uzkd.onrender.com';
+       const SERVER_URL = 'https://together-uzkd.onrender.com';
 // Force secure connection
 const socket = io(SERVER_URL, {
     secure: true,
     transports: ['websocket', 'polling']
 });
+
 
