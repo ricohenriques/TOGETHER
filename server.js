@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 const OpenAI = require('openai');
 require('dotenv').config();
 
@@ -18,6 +19,9 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // OpenAI setup
 const openai = new OpenAI({
@@ -433,4 +437,5 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🚀 Couples Counseling Server running on port ${PORT}`);
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
+
 });
