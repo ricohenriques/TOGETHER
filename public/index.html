@@ -441,7 +441,366 @@
     </div>
 
     <!-- Socket.IO Client -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script <script>
+        // Configuration
+        const SERVER_URL = 'https://together-udw8.onrender.com';
+
+        // App state
+        let socket = null;
+        let currentUser = '';
+        let currentSession = '';
+        let isConnected = false;
+        let typingTimeout = null;
+
+        // DOM elements
+        const joinForm = document.getElementById('joinForm');
+        const chatArea = document.getElementById('chatArea');
+        const messages = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusBar = document.getElementById('statusBar');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const sessionInfo = document.getElementById('sessionInfo');
+        const sessionControls = document.getElementById('sessionControls');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Initialize socket connection
+        function initializeSocket() {
+            console.log('Connecting to:', SERVER_URL);
+            socket = io(SERVER_URL, {
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                isConnected = true;
+                updateConnectionStatus('Connected', true);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+                isConnected = false;
+                updateConnectionStatus('Disconnected', false);
+            });
+
+            socket.on('session-created', (data) => {
+                console.log('Session created:', data);
+                currentSession = data.sessionCode;
+                currentUser = data.userName;
+                showChat();
+                updateSessionInfo(data.sessionCode, 1);
+                statusBar.textContent = `Session created! Share code: ${data.sessionCode}`;
+            });
+
+            socket.on('session-joined', (data) => {
+                console.log('Session joined:', data);
+                currentSession = data.sessionCode;
+                currentUser = data.userName;
+                showChat();
+                updateSessionInfo(data.sessionCode, 2);
+                statusBar.textContent = `Connected to session: ${data.sessionCode}`;
+                
+                // Load message history
+                data.messages.forEach(msg => {
+                    displayMessage(msg);
+                });
+            });
+
+            socket.on('message', (message) => {
+                console.log('New message:', message);
+                displayMessage(message);
+                
+                // Remove typing indicator if it was from this sender
+                hideTypingIndicator(message.senderName);
+            });
+
+            socket.on('user-typing', (data) => {
+                if (data.isTyping) {
+                    showTypingIndicator(data.userName);
+                } else {
+                    hideTypingIndicator(data.userName);
+                }
+            });
+
+            socket.on('session-ended', () => {
+                statusBar.textContent = 'Session ended';
+                setTimeout(() => {
+                    resetToJoinForm();
+                }, 3000);
+            });
+
+            socket.on('error', (error) => {
+                console.error('Socket error:', error);
+                showError(error.message);
+            });
+        }
+
+        // Update connection status
+        function updateConnectionStatus(text, connected) {
+            statusText.textContent = text;
+            if (connected) {
+                statusDot.classList.remove('disconnected');
+            } else {
+                statusDot.classList.add('disconnected');
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        // Create new session
+        function createSession() {
+            const userName = document.getElementById('userName').value.trim();
+            
+            if (!userName) {
+                showError('Please enter your name');
+                return;
+            }
+
+            if (!isConnected) {
+                showError('Not connected to server. Please refresh and try again.');
+                return;
+            }
+
+            socket.emit('create-session', { userName });
+        }
+
+        // Join existing session
+        function joinSession() {
+            const userName = document.getElementById('userName').value.trim();
+            const sessionCode = document.getElementById('sessionInput').value.trim().toUpperCase();
+            
+            if (!userName) {
+                showError('Please enter your name');
+                return;
+            }
+
+            if (!sessionCode) {
+                showError('Please enter a session code');
+                return;
+            }
+
+            if (!isConnected) {
+                showError('Not connected to server. Please refresh and try again.');
+                return;
+            }
+
+            socket.emit('join-session', { userName, sessionCode });
+        }
+
+        // Show chat interface
+        function showChat() {
+            joinForm.style.display = 'none';
+            chatArea.classList.add('active');
+            sessionInfo.style.display = 'block';
+            sessionControls.style.display = 'flex';
+            messageInput.focus();
+        }
+
+        // Update session info
+        function updateSessionInfo(code, participantCount) {
+            document.getElementById('sessionCode').textContent = code;
+            document.getElementById('participantCount').textContent = participantCount;
+        }
+
+        // Display message
+        function displayMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            // Determine message type and styling
+            if (message.sender === 'sage') {
+                messageDiv.classList.add('sage');
+            } else if (message.sender === 'system') {
+                messageDiv.classList.add('system');
+            } else if (message.type === 'interruption') {
+                messageDiv.classList.add('interruption');
+            } else if (message.senderName === currentUser) {
+                messageDiv.classList.add('user');
+            } else {
+                messageDiv.classList.add('other-user');
+            }
+
+            // Add sender name for non-system messages
+            if (message.sender !== 'system' && message.senderName !== currentUser) {
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'message-header';
+                headerDiv.textContent = message.senderName;
+                messageDiv.appendChild(headerDiv);
+            }
+
+            // Add message content
+            const contentDiv = document.createElement('div');
+            contentDiv.textContent = message.content;
+            messageDiv.appendChild(contentDiv);
+
+            // Add timestamp
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date(message.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            messageDiv.appendChild(timeDiv);
+
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Send message
+        function sendMessage() {
+            const content = messageInput.value.trim();
+            
+            if (!content || !isConnected) {
+                return;
+            }
+
+            socket.emit('send-message', { content });
+            messageInput.value = '';
+            
+            // Stop typing indicator
+            socket.emit('typing', { isTyping: false });
+            
+            // Auto-resize textarea
+            messageInput.style.height = 'auto';
+        }
+
+        // Show typing indicator
+        function showTypingIndicator(userName) {
+            // Remove existing typing indicator for this user
+            hideTypingIndicator(userName);
+            
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = `typing-${userName}`;
+            typingDiv.innerHTML = `
+                <span>${userName} is typing</span>
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            
+            messages.appendChild(typingDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTypingIndicator(userName) {
+            const existingIndicator = document.getElementById(`typing-${userName}`);
+            if (existingIndicator) {
+                existingIndicator.remove();
+            }
+        }
+
+        // Handle typing events
+        function handleTyping() {
+            if (!isConnected) return;
+            
+            socket.emit('typing', { isTyping: true });
+            
+            // Clear existing timeout
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+            
+            // Set timeout to stop typing indicator
+            typingTimeout = setTimeout(() => {
+                socket.emit('typing', { isTyping: false });
+            }, 3000);
+        }
+
+        // Session controls
+        function pauseSession() {
+            if (socket && isConnected) {
+                socket.emit('pause-session');
+            }
+        }
+
+        function endSession() {
+            if (confirm('Are you sure you want to end the session?')) {
+                if (socket && isConnected) {
+                    socket.emit('end-session');
+                }
+            }
+        }
+
+        // Reset to join form
+        function resetToJoinForm() {
+            chatArea.classList.remove('active');
+            joinForm.style.display = 'block';
+            sessionInfo.style.display = 'none';
+            sessionControls.style.display = 'none';
+            messages.innerHTML = '';
+            currentUser = '';
+            currentSession = '';
+            document.getElementById('userName').value = '';
+            document.getElementById('sessionInput').value = '';
+        }
+
+        // Event listeners
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        messageInput.addEventListener('input', () => {
+            // Handle typing indicator
+            handleTyping();
+            
+            // Auto-resize textarea
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Enter in username field
+            if (e.key === 'Enter' && document.activeElement === document.getElementById('userName')) {
+                document.getElementById('sessionInput').focus();
+            }
+            
+            // Enter in session code field
+            if (e.key === 'Enter' && document.activeElement === document.getElementById('sessionInput')) {
+                joinSession();
+            }
+        });
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing couples counseling app...');
+            initializeSocket();
+            document.getElementById('userName').focus();
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Page is hidden - user switched apps
+                if (socket && isConnected) {
+                    socket.emit('typing', { isTyping: false });
+                }
+            }
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            if (socket) {
+                socket.disconnect();
+            }
+        });
+    </script>
     
     <script>
         // Configuration - UPDATE THIS URL TO YOUR DEPLOYED SERVER
@@ -451,6 +810,7 @@ const socket = io(SERVER_URL, {
     secure: true,
     transports: ['websocket', 'polling']
 });
+
 
 
 
