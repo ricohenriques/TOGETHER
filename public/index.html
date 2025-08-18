@@ -445,8 +445,9 @@
     
     <script>
         // Configuration - UPDATE THIS URL TO YOUR DEPLOYED SERVER
-        const SERVER_URL = 'https://together-uzkd.onrender.com';
-
-        // For development: const SERVER_URL = 'http://localhost:3001
-
-
+       const SERVER_URL = 'https://together-uzkd.onrender.com';
+// Force secure connection
+const socket = io(SERVER_URL, {
+    secure: true,
+    transports: ['websocket', 'polling']
+});
