@@ -945,8 +945,6 @@ socket.on('turn-released', () => {
                 socket.disconnect();
             }
             // Turn-based speaking functions
-let currentTurn = null;
-let isInputLocked = false;
 
 function handleTurnAssignment(data) {
     currentTurn = data.assignedTo;
@@ -1063,6 +1061,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
