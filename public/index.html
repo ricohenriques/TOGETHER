@@ -609,8 +609,10 @@
                 updateConnectionStatus('Disconnected', false);
             });
 
-            socket.on('session-created', (data) => {
+socket.on('session-created', (data) => {
     console.log('Session created:', data);
+    console.log('Session code from server:', data.sessionCode);
+    
     currentSession = data.sessionCode;
     currentUser = data.userName;
     
@@ -621,19 +623,23 @@
     messageInput.focus();
     unlockInput();
     
-    // Force session info to show with a slight delay
-    setTimeout(() => {
-        const sessionInfo = document.getElementById('sessionInfo');
-        const sessionCodeSpan = document.getElementById('sessionCode');
-        const participantCountSpan = document.getElementById('participantCount');
-        
-        sessionInfo.style.display = 'block';
-        sessionCodeSpan.textContent = data.sessionCode;
-        participantCountSpan.textContent = '1';
-        
-        console.log('Session code set to:', data.sessionCode);
-        console.log('Element content:', sessionCodeSpan.textContent);
-    }, 100);
+    // Multiple attempts to set session code
+    const sessionCodeElement = document.getElementById('sessionCode');
+    console.log('Found session code element:', sessionCodeElement);
+    
+    if (sessionCodeElement) {
+        sessionCodeElement.textContent = data.sessionCode;
+        console.log('Set session code to:', data.sessionCode);
+        console.log('Element now shows:', sessionCodeElement.textContent);
+    } else {
+        console.error('Could not find sessionCode element!');
+    }
+    
+    // Also set participant count
+    const participantElement = document.getElementById('participantCount');
+    if (participantElement) {
+        participantElement.textContent = '1';
+    }
     
     statusBar.textContent = `Session created! Share code: ${data.sessionCode}`;
 });
@@ -1081,6 +1087,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
