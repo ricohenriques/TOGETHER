@@ -825,11 +825,66 @@ socket.on('turn-released', () => {
             if (socket) {
                 socket.disconnect();
             }
+            // Turn-based speaking functions
+let currentTurn = null;
+let isInputLocked = false;
+
+function handleTurnAssignment(data) {
+    currentTurn = data.assignedTo;
+    const isMyTurn = data.assignedTo === currentUser;
+    
+    if (isMyTurn) {
+        showTurnIndicator(`It's your turn: "${data.question}"`, 'your-turn');
+        unlockInput();
+    } else {
+        showTurnIndicator(`Waiting for ${data.assignedTo}: "${data.question}"`, 'waiting');
+        lockInput();
+    }
+}
+
+function handleTurnRelease() {
+    currentTurn = null;
+    hideTurnIndicator();
+    unlockInput();
+}
+
+function showTurnIndicator(message, type) {
+    const existing = document.getElementById('turnIndicator');
+    if (existing) existing.remove();
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'turnIndicator';
+    indicator.className = `turn-indicator ${type}`;
+    indicator.innerHTML = `<div class="turn-message">${message}</div>`;
+    
+    const statusBar = document.getElementById('statusBar');
+    statusBar.parentNode.insertBefore(indicator, statusBar.nextSibling);
+}
+
+function hideTurnIndicator() {
+    const indicator = document.getElementById('turnIndicator');
+    if (indicator) indicator.remove();
+}
+
+function lockInput() {
+    isInputLocked = true;
+    messageInput.disabled = true;
+    messageInput.placeholder = "Waiting for your partner...";
+    sendBtn.disabled = true;
+}
+
+function unlockInput() {
+    isInputLocked = false;
+    messageInput.disabled = false;
+    messageInput.placeholder = "Type your message...";
+    sendBtn.disabled = false;
+}
         });
     </script>
      
 </body>
 </html>
+
 
 
 
