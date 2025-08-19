@@ -533,10 +533,28 @@
                 }, 3000);
             });
 
-            socket.on('error', (error) => {
-                console.error('Socket error:', error);
-                showError(error.message);
-            });
+            socket.on('participant-count-updated', (data) => {
+    console.log('Participant count updated:', data);
+    updateSessionInfo(currentSession, data.count);
+});
+
+socket.on('connect_error', (error) => {
+    console.log('Connection error:', error);
+    updateConnectionStatus('Reconnecting...', false);
+});
+
+socket.on('reconnect', (attemptNumber) => {
+    console.log('Reconnected after', attemptNumber, 'attempts');
+    updateConnectionStatus('Reconnected', true);
+});
+
+socket.on('turn-assigned', (data) => {
+    handleTurnAssignment(data);
+});
+
+socket.on('turn-released', () => {
+    handleTurnRelease();
+});
         }
 
         // Update connection status
@@ -806,6 +824,7 @@
      
 </body>
 </html>
+
 
 
 
