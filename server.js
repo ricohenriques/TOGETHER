@@ -204,24 +204,75 @@ io.on('connection', (socket) => {
   });
 
   // Join existing session
-  socket.on('join-session', (data) => {
-    const session = sessions.get(data.sessionCode);
+  // In your server.js file, find the 'join-session' handler and replace it with this:
+
+socket.on('join-session', (data) => {
+  const session = sessions.get(data.sessionCode);
+  
+  if (!session) {
+    socket.emit('error', { message: 'Session not found' });
+    return;
+  }
+
+  if (session.participants.length >= 2) {
+    socket.emit('error', { message: 'Session is full' });
+    return;
+  }
+
+  // Add participant
+  session.participants.push({
+    id: socket.id,
+    name: data.userName,
+    joinedAt: new Date()
+  });
+
+  userSessions.set(socket.id, session.id);
+  socket.join(session.id);
+
+  // Send session data to new participant
+  socket.emit('session-joined', {
+    sessionCode: session.code,
+    sessionId: session.id,
+    userName: data.userName,
+    messages: session.messages
+  });
+
+  // **FIX: Notify ALL participants about updated count**
+  io.to(session.id).emit('participant-count-updated', {
+    count: session.participants.length,
+    participants: session.participants.map(p => p.name)
+  });
+
+  // Notify all participants about new joiner
+  const joinMessage = {
+    id: Date.now(),
+    content: `${data.userName} has joined the session.`,
+    sender: 'system',
+    senderName: 'System',
+    timestamp: new Date()
+  };
+
+  session.messages.push(joinMessage);
+  io.to(session.id).emit('message', joinMessage);
+
+  // Sage's start message when both are present
+  if (session.participants.length === 2) {
+    session.status = 'active';
     
-    if (!session) {
-      socket.emit('error', { message: 'Session not found' });
-      return;
-    }
+    setTimeout(() => {
+      const startMessage = {
+        id: Date.now() + 1,
+        content: `Perfect! Both partners are now here. I'm ready to help facilitate your conversation. Remember, this is a safe space for open communication. What would you both like to focus on today?`,
+        sender: 'sage',
+        senderName: 'Sage',
+        timestamp: new Date()
+      };
 
-    if (session.participants.length >= 2) {
-      socket.emit('error', { message: 'Session is full' });
-      return;
-    }
-
-    // Add participant
-    session.participants.push({
-      id: socket.id,
-      name: data.userName,
-      joinedAt: new Date()
+      session.messages.push(startMessage);
+      io.to(session.id).emit('message', startMessage);
+    }, 1500);
+  }
+});
     });
 
     userSessions.set(socket.id, session.id);
@@ -439,3 +490,4 @@ server.listen(PORT, () => {
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
 
 });
+
