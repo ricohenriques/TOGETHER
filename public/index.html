@@ -57,27 +57,27 @@
 /* Better mobile responsiveness */
 @media (max-width: 480px) {
     body {
-        padding: 0; /* Remove body padding on mobile */
+        padding: 0;
         margin: 0;
     }
     
     .container {
         margin: 0;
-        border-radius: 0; /* Remove border radius on mobile for full screen */
+        border-radius: 0;
         min-height: 100vh;
         max-width: 100vw;
     }
     
     .chat-area {
-        height: calc(100vh - 140px); /* Adjusted for mobile */
+        height: calc(100vh - 140px);
     }
     
     .header {
-        padding-top: max(20px, env(safe-area-inset-top)); /* Handle iPhone notch */
+        padding-top: max(20px, env(safe-area-inset-top));
     }
     
     .input-area {
-        padding-bottom: max(15px, env(safe-area-inset-bottom)); /* Handle iPhone home indicator */
+        padding-bottom: max(15px, env(safe-area-inset-bottom));
     }
 }
 
@@ -1000,6 +1000,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
