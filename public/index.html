@@ -613,14 +613,22 @@
     console.log('Session created:', data);
     currentSession = data.sessionCode;
     currentUser = data.userName;
+    
+    // Show chat first
     showChat();
     
-    // Debug: Force the session code to display
-    console.log('Updating session code to:', data.sessionCode);
+    // Force session info to show and update
+    const sessionInfo = document.getElementById('sessionInfo');
+    sessionInfo.style.display = 'block';
+    
+    // Force session code update
     document.getElementById('sessionCode').textContent = data.sessionCode;
     document.getElementById('participantCount').textContent = '1';
     
+    // Also show in status bar
     statusBar.textContent = `Session created! Share code: ${data.sessionCode}`;
+    
+    console.log('Should now see session code:', data.sessionCode);
 });
 
             socket.on('session-joined', (data) => {
@@ -1066,6 +1074,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
