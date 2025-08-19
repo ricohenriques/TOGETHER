@@ -274,36 +274,66 @@ io.on('connection', (socket) => {
   });
 
   // Handle messages
-  socket.on('send-message', async (data) => {
-    const sessionId = userSessions.get(socket.id);
-    const session = sessions.get(sessionId);
+  // In your server.js file, find the 'send-message' handler and replace it with this version:
 
-    if (!session) {
-      socket.emit('error', { message: 'Session not found' });
-      return;
-    }
+socket.on('send-message', async (data) => {
+  const sessionId = userSessions.get(socket.id);
+  const session = sessions.get(sessionId);
 
-    const participant = session.participants.find(p => p.id === socket.id);
-    if (!participant) {
-      socket.emit('error', { message: 'Not authorized for this session' });
-      return;
-    }
+  if (!session) {
+    socket.emit('error', { message: 'Session not found' });
+    return;
+  }
 
-    // Create message object
-    const message = {
-      id: Date.now(),
-      content: data.content,
-      sender: socket.id,
-      senderName: participant.name,
-      timestamp: new Date()
-    };
+  const participant = session.participants.find(p => p.id === socket.id);
+  if (!participant) {
+    socket.emit('error', { message: 'Not authorized for this session' });
+    return;
+  }
 
-    // Store message
-    session.messages.push(message);
+  // Create message object
+  const message = {
+    id: Date.now(),
+    content: data.content,
+    sender: socket.id,
+    senderName: participant.name,
+    timestamp: new Date()
+  };
 
-    // Broadcast to all participants
-    io.to(sessionId).emit('message', message);
+  // Store message
+  session.messages.push(message);
 
+  // Broadcast to all participants
+  io.to(sessionId).emit('message', message);
+
+  // Always allow AI responses, even with single participant
+  if (session.participants.length === 1) {
+    // Special single-user responses
+    setTimeout(async () => {
+      const singleUserResponses = [
+        "I'm here with you. While we wait for your partner to join, feel free to share what's on your mind. Sometimes it helps to organize your thoughts before they arrive.",
+        "Thank you for sharing that with me. What would you like your partner to understand about this when they join us?",
+        "I hear you. Take your time to express yourself. What's most important for you to communicate today?",
+        "That sounds significant. How are you feeling about having this conversation with your partner?",
+        "I'm listening. What outcome are you hoping for from today's session?"
+      ];
+      
+      const response = singleUserResponses[Math.floor(Math.random() * singleUserResponses.length)];
+      
+      const responseMessage = {
+        id: Date.now(),
+        content: response,
+        sender: 'sage',
+        senderName: 'Sage',
+        timestamp: new Date()
+      };
+
+      session.messages.push(responseMessage);
+      io.to(sessionId).emit('message', responseMessage);
+    }, 1500 + Math.random() * 2000); // 1.5-3.5 second delay
+    
+  } else {
+    // Normal two-participant logic
     // Check for intervention triggers
     const intervention = checkInterventionTriggers(sessionId, message);
     
@@ -339,7 +369,8 @@ io.on('connection', (socket) => {
         io.to(sessionId).emit('message', responseMessage);
       }, 2000 + Math.random() * 3000); // 2-5 second delay
     }
-  });
+  }
+});
 
   // Handle typing indicators
   socket.on('typing', (data) => {
@@ -451,3 +482,4 @@ server.listen(PORT, () => {
   console.log(`🚀 Couples Counseling Server running on port ${PORT}`);
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
 });
+
