@@ -314,6 +314,7 @@ socket.on('join-session', (data) => {
         session.messages.push(startMessage);
         io.to(session.id).emit('message', startMessage);
       }, 1500);
+      }
     }
   });
 
@@ -490,4 +491,5 @@ server.listen(PORT, () => {
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
 
 });
+
 
