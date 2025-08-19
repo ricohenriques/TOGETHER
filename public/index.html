@@ -88,7 +88,7 @@
     border: 2px solid #e5e7eb;
     border-radius: 25px;
     font-size: 16px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; /* Much better font */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-weight: 400;
     color: #1f2937;
     outline: none;
@@ -97,6 +97,16 @@
     max-height: 120px;
     line-height: 1.5;
     letter-spacing: 0.01em;
+}
+
+.message-input::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+.message-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .message-input::placeholder {
@@ -990,6 +1000,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
