@@ -276,6 +276,8 @@ io.on('connection', (socket) => {
   // Handle messages
   // In your server.js file, find the 'send-message' handler and replace it with this version:
 
+// Replace your 'send-message' handler in server.js with this smarter version:
+
 socket.on('send-message', async (data) => {
   const sessionId = userSessions.get(socket.id);
   const session = sessions.get(sessionId);
@@ -306,38 +308,70 @@ socket.on('send-message', async (data) => {
   // Broadcast to all participants
   io.to(sessionId).emit('message', message);
 
-  // Always allow AI responses, even with single participant
-  if (session.participants.length === 1) {
-    // Special single-user responses
-    setTimeout(async () => {
-      const singleUserResponses = [
-        "I'm here with you. While we wait for your partner to join, feel free to share what's on your mind. Sometimes it helps to organize your thoughts before they arrive.",
-        "Thank you for sharing that with me. What would you like your partner to understand about this when they join us?",
-        "I hear you. Take your time to express yourself. What's most important for you to communicate today?",
-        "That sounds significant. How are you feeling about having this conversation with your partner?",
-        "I'm listening. What outcome are you hoping for from today's session?"
-      ];
-      
-      const response = singleUserResponses[Math.floor(Math.random() * singleUserResponses.length)];
-      
-      const responseMessage = {
-        id: Date.now(),
-        content: response,
-        sender: 'sage',
-        senderName: 'Sage',
-        timestamp: new Date()
-      };
+  // Initialize conversation tracking if not exists
+  if (!session.conversationState) {
+    session.conversationState = {
+      messagesSinceLastSage: 0,
+      lastSageTime: Date.now(),
+      consecutiveFromSameUser: 0,
+      lastSender: null
+    };
+  }
 
-      session.messages.push(responseMessage);
-      io.to(sessionId).emit('message', responseMessage);
-    }, 1500 + Math.random() * 2000); // 1.5-3.5 second delay
-    
+  const convState = session.conversationState;
+  convState.messagesSinceLastSage++;
+
+  // Track consecutive messages from same user
+  if (convState.lastSender === message.sender) {
+    convState.consecutiveFromSameUser++;
   } else {
-    // Normal two-participant logic
-    // Check for intervention triggers
-    const intervention = checkInterventionTriggers(sessionId, message);
-    
-    if (intervention) {
+    convState.consecutiveFromSameUser = 1;
+    convState.lastSender = message.sender;
+  }
+
+  // Determine if Sage should respond
+  let shouldSageRespond = false;
+  let responseType = 'normal';
+
+  // PRIORITY 1: Immediate intervention needed
+  const intervention = checkInterventionTriggers(sessionId, message);
+  if (intervention) {
+    shouldSageRespond = true;
+    responseType = 'intervention';
+  }
+  // PRIORITY 2: One person dominating (3+ consecutive messages)
+  else if (convState.consecutiveFromSameUser >= 3) {
+    shouldSageRespond = true;
+    responseType = 'redirect';
+  }
+  // PRIORITY 3: Long silence from Sage (8+ messages without input)
+  else if (convState.messagesSinceLastSage >= 8) {
+    shouldSageRespond = true;
+    responseType = 'checkin';
+  }
+  // PRIORITY 4: Heated language detected
+  else if (detectHeatedLanguage(message.content)) {
+    shouldSageRespond = true;
+    responseType = 'deescalate';
+  }
+  // PRIORITY 5: Time-based check-in (5+ minutes of silence from Sage)
+  else if (Date.now() - convState.lastSageTime > 5 * 60 * 1000) {
+    shouldSageRespond = true;
+    responseType = 'checkin';
+  }
+  // PRIORITY 6: Strategic guidance moments (after emotional sharing)
+  else if (detectEmotionalContent(message.content) && convState.messagesSinceLastSage >= 3) {
+    shouldSageRespond = true;
+    responseType = 'support';
+  }
+
+  if (shouldSageRespond) {
+    // Reset tracking
+    convState.messagesSinceLastSage = 0;
+    convState.lastSageTime = Date.now();
+    convState.consecutiveFromSameUser = 0;
+
+    if (responseType === 'intervention') {
       // Send intervention message
       setTimeout(() => {
         const interventionMessage = {
@@ -353,9 +387,9 @@ socket.on('send-message', async (data) => {
         io.to(sessionId).emit('message', interventionMessage);
       }, 1000);
     } else {
-      // Normal Sage response (with delay to seem natural)
+      // Strategic Sage response
       setTimeout(async () => {
-        const sageResponse = await getSageResponse(message, sessionId, session.messages);
+        const sageResponse = await getStrategicSageResponse(message, sessionId, session.messages, responseType);
         
         const responseMessage = {
           id: Date.now(),
@@ -367,10 +401,74 @@ socket.on('send-message', async (data) => {
 
         session.messages.push(responseMessage);
         io.to(sessionId).emit('message', responseMessage);
-      }, 2000 + Math.random() * 3000); // 2-5 second delay
+      }, 2000 + Math.random() * 2000); // 2-4 second delay
     }
   }
 });
+
+// Helper functions for detection
+function detectHeatedLanguage(content) {
+  const heatedWords = ['always', 'never', 'stupid', 'ridiculous', 'insane', 'crazy', 'hate', 'angry', 'furious', 'sick of'];
+  return heatedWords.some(word => content.toLowerCase().includes(word));
+}
+
+function detectEmotionalContent(content) {
+  const emotionalWords = ['feel', 'feeling', 'hurt', 'sad', 'upset', 'frustrated', 'worried', 'scared', 'love', 'miss'];
+  return emotionalWords.some(word => content.toLowerCase().includes(word));
+}
+
+// Strategic response based on context
+async function getStrategicSageResponse(message, sessionId, conversationHistory, responseType) {
+  try {
+    const session = sessions.get(sessionId);
+    if (!session) return "I'm having trouble accessing our session.";
+
+    let strategicPrompt = SAGE_SYSTEM_PROMPT;
+    
+    // Add response type specific guidance
+    switch (responseType) {
+      case 'redirect':
+        strategicPrompt += "\n\nThe same person has been speaking for several messages. Gently redirect to give the other person space to share.";
+        break;
+      case 'checkin':
+        strategicPrompt += "\n\nIt's been a while since you've spoken. Check in on how the conversation is going for both people.";
+        break;
+      case 'deescalate':
+        strategicPrompt += "\n\nThere's some heated language. Help both people take a breath and communicate more calmly.";
+        break;
+      case 'support':
+        strategicPrompt += "\n\nSomeone just shared something emotional. Provide supportive guidance that helps both partners understand each other.";
+        break;
+    }
+
+    const recentMessages = conversationHistory.slice(-6);
+    const contextMessages = [
+      { role: "system", content: strategicPrompt },
+      { role: "system", content: `Session context: ${session.participants.length} participants. Response type: ${responseType}` }
+    ];
+
+    recentMessages.forEach(msg => {
+      if (msg.sender !== 'sage' && msg.sender !== 'system') {
+        contextMessages.push({
+          role: "user",
+          content: `${msg.senderName}: ${msg.content}`
+        });
+      }
+    });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: contextMessages,
+      max_tokens: 150,
+      temperature: 0.7
+    });
+
+    return completion.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('OpenAI API Error:', error);
+    return "I'm experiencing some technical difficulties. Please continue your conversation - you're doing great at communicating with each other.";
+  }
+}
 
   // Handle typing indicators
   socket.on('typing', (data) => {
@@ -482,4 +580,5 @@ server.listen(PORT, () => {
   console.log(`🚀 Couples Counseling Server running on port ${PORT}`);
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
 });
+
 
