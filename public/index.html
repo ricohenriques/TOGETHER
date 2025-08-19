@@ -504,7 +504,7 @@
                 <div class="status-dot disconnected" id="statusDot"></div>
                 <span id="statusText">Connecting...</span>
             </div>
-            <div class="session-info" id="sessionInfo" style="display: block;">
+            <div class="session-info" id="sessionInfo" style="display: none;">
                 Session: <span id="sessionCode"></span><br>
                 Participants: <span id="participantCount">1</span>/2
             </div>
@@ -610,36 +610,23 @@
             });
 
 socket.on('session-created', (data) => {
-    console.log('Session created:', data);
-    console.log('Session code from server:', data.sessionCode);
+    console.log('Session created with code:', data.sessionCode);
     
     currentSession = data.sessionCode;
     currentUser = data.userName;
     
-    // Show chat interface
+    // Show chat
     joinForm.style.display = 'none';
     chatArea.classList.add('active');
     sessionControls.style.display = 'flex';
+    
+    // Show and update session info
+    document.getElementById('sessionInfo').style.display = 'block';
+    document.getElementById('sessionCode').innerHTML = data.sessionCode;
+    document.getElementById('participantCount').innerHTML = '1';
+    
     messageInput.focus();
     unlockInput();
-    
-    // Multiple attempts to set session code
-    const sessionCodeElement = document.getElementById('sessionCode');
-    console.log('Found session code element:', sessionCodeElement);
-    
-    if (sessionCodeElement) {
-        sessionCodeElement.textContent = data.sessionCode;
-        console.log('Set session code to:', data.sessionCode);
-        console.log('Element now shows:', sessionCodeElement.textContent);
-    } else {
-        console.error('Could not find sessionCode element!');
-    }
-    
-    // Also set participant count
-    const participantElement = document.getElementById('participantCount');
-    if (participantElement) {
-        participantElement.textContent = '1';
-    }
     
     statusBar.textContent = `Session created! Share code: ${data.sessionCode}`;
 });
@@ -1087,6 +1074,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
