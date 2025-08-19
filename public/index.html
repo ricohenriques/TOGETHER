@@ -739,13 +739,16 @@ socket.on('turn-released', () => {
         }
 
         // Show chat interface
-        function showChat() {
+            function showChat() {
             joinForm.style.display = 'none';
             chatArea.classList.add('active');
             sessionInfo.style.display = 'block';
             sessionControls.style.display = 'flex';
             messageInput.focus();
-        }
+    
+        // Always unlock input when entering chat
+        unlockInput();
+    }
 
         // Update session info
         function updateSessionInfo(code, participantCount) {
@@ -801,7 +804,7 @@ socket.on('turn-released', () => {
         function sendMessage() {
             const content = messageInput.value.trim();
             
-            if (!content || !isConnected || isInputLocked) {
+            if (!content || !isConnected) {
                 return;
             }
 
@@ -994,12 +997,16 @@ function unlockInput() {
     messageInput.disabled = false;
     messageInput.placeholder = "Type your message...";
     sendBtn.disabled = false;
+    messageInput.style.opacity = '1';
+    sendBtn.style.opacity = '1';
+    messageInput.style.background = 'white';
 }
         });
     </script>
      
 </body>
 </html>
+
 
 
 
