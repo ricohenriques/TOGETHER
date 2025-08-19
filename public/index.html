@@ -685,7 +685,7 @@ socket.on('turn-released', () => {
         function sendMessage() {
             const content = messageInput.value.trim();
             
-            if (!content || !isConnected) {
+            if (!content || !isConnected || isInputLocked) {
                 return;
             }
 
@@ -884,6 +884,7 @@ function unlockInput() {
      
 </body>
 </html>
+
 
 
 
