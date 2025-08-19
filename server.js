@@ -320,27 +320,71 @@ socket.on('join-session', (data) => {
 
   // Handle messages
   socket.on('send-message', async (data) => {
-    const sessionId = userSessions.get(socket.id);
-    const session = sessions.get(sessionId);
+  const sessionId = userSessions.get(socket.id);
+  const session = sessions.get(sessionId);
 
-    if (!session) {
-      socket.emit('error', { message: 'Session not found' });
-      return;
-    }
+  if (!session) {
+    socket.emit('error', { message: 'Session not found' });
+    return;
+  }
 
-    const participant = session.participants.find(p => p.id === socket.id);
-    if (!participant) {
-      socket.emit('error', { message: 'Not authorized for this session' });
-      return;
-    }
+  const participant = session.participants.find(p => p.id === socket.id);
+  if (!participant) {
+    socket.emit('error', { message: 'Not authorized for this session' });
+    return;
+  }
 
-    // Create message object
-    const message = {
-      id: Date.now(),
-      content: data.content,
-      sender: socket.id,
-      senderName: participant.name,
-      timestamp: new Date()
+  // Create message object
+  const message = {
+    id: Date.now(),
+    content: data.content,
+    sender: socket.id,
+    senderName: participant.name,
+    timestamp: new Date()
+  };
+
+  // Store message
+  session.messages.push(message);
+
+  // Broadcast to all participants
+  io.to(sessionId).emit('message', message);
+
+  // Check for intervention triggers
+  const intervention = checkInterventionTriggers(sessionId, message);
+  
+  if (intervention) {
+    // Send intervention message
+    setTimeout(() => {
+      const interventionMessage = {
+        id: Date.now(),
+        content: intervention.message,
+        sender: 'sage',
+        senderName: 'Sage',
+        timestamp: new Date(),
+        type: 'interruption'
+      };
+
+      session.messages.push(interventionMessage);
+      io.to(sessionId).emit('message', interventionMessage);
+    }, 1000);
+  } else {
+    // Normal Sage response
+    setTimeout(async () => {
+      const sageResponse = await getSageResponse(message, sessionId, session.messages);
+      
+      const responseMessage = {
+        id: Date.now(),
+        content: sageResponse,
+        sender: 'sage',
+        senderName: 'Sage',
+        timestamp: new Date()
+      };
+
+      session.messages.push(responseMessage);
+      io.to(sessionId).emit('message', responseMessage);
+    }, 2000 + Math.random() * 3000);
+  }
+});
     };
 
     // Store message
@@ -491,5 +535,6 @@ server.listen(PORT, () => {
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
 
 });
+
 
 
