@@ -19,6 +19,7 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -204,75 +205,24 @@ io.on('connection', (socket) => {
   });
 
   // Join existing session
-  // In your server.js file, find the 'join-session' handler and replace it with this:
-
-socket.on('join-session', (data) => {
-  const session = sessions.get(data.sessionCode);
-  
-  if (!session) {
-    socket.emit('error', { message: 'Session not found' });
-    return;
-  }
-
-  if (session.participants.length >= 2) {
-    socket.emit('error', { message: 'Session is full' });
-    return;
-  }
-
-  // Add participant
-  session.participants.push({
-    id: socket.id,
-    name: data.userName,
-    joinedAt: new Date()
-  });
-
-  userSessions.set(socket.id, session.id);
-  socket.join(session.id);
-
-  // Send session data to new participant
-  socket.emit('session-joined', {
-    sessionCode: session.code,
-    sessionId: session.id,
-    userName: data.userName,
-    messages: session.messages
-  });
-
-  // **FIX: Notify ALL participants about updated count**
-  io.to(session.id).emit('participant-count-updated', {
-    count: session.participants.length,
-    participants: session.participants.map(p => p.name)
-  });
-
-  // Notify all participants about new joiner
-  const joinMessage = {
-    id: Date.now(),
-    content: `${data.userName} has joined the session.`,
-    sender: 'system',
-    senderName: 'System',
-    timestamp: new Date()
-  };
-
-  session.messages.push(joinMessage);
-  io.to(session.id).emit('message', joinMessage);
-
-  // Sage's start message when both are present
-  if (session.participants.length === 2) {
-    session.status = 'active';
+  socket.on('join-session', (data) => {
+    const session = sessions.get(data.sessionCode);
     
-    setTimeout(() => {
-      const startMessage = {
-        id: Date.now() + 1,
-        content: `Perfect! Both partners are now here. I'm ready to help facilitate your conversation. Remember, this is a safe space for open communication. What would you both like to focus on today?`,
-        sender: 'sage',
-        senderName: 'Sage',
-        timestamp: new Date()
-      };
+    if (!session) {
+      socket.emit('error', { message: 'Session not found' });
+      return;
+    }
 
-      session.messages.push(startMessage);
-      io.to(session.id).emit('message', startMessage);
-    }, 1500);
-  }
-});
+    if (session.participants.length >= 2) {
+      socket.emit('error', { message: 'Session is full' });
+      return;
+    }
+
+    // Add participant
+    session.participants.push({
+      id: socket.id,
+      name: data.userName,
+      joinedAt: new Date()
     });
 
     userSessions.set(socket.id, session.id);
@@ -284,6 +234,12 @@ socket.on('join-session', (data) => {
       sessionId: session.id,
       userName: data.userName,
       messages: session.messages
+    });
+
+    // Notify ALL participants about updated count
+    io.to(session.id).emit('participant-count-updated', {
+      count: session.participants.length,
+      participants: session.participants.map(p => p.name)
     });
 
     // Notify all participants
@@ -314,77 +270,32 @@ socket.on('join-session', (data) => {
         session.messages.push(startMessage);
         io.to(session.id).emit('message', startMessage);
       }, 1500);
-      }
     }
   });
 
   // Handle messages
   socket.on('send-message', async (data) => {
-  const sessionId = userSessions.get(socket.id);
-  const session = sessions.get(sessionId);
+    const sessionId = userSessions.get(socket.id);
+    const session = sessions.get(sessionId);
 
-  if (!session) {
-    socket.emit('error', { message: 'Session not found' });
-    return;
-  }
+    if (!session) {
+      socket.emit('error', { message: 'Session not found' });
+      return;
+    }
 
-  const participant = session.participants.find(p => p.id === socket.id);
-  if (!participant) {
-    socket.emit('error', { message: 'Not authorized for this session' });
-    return;
-  }
+    const participant = session.participants.find(p => p.id === socket.id);
+    if (!participant) {
+      socket.emit('error', { message: 'Not authorized for this session' });
+      return;
+    }
 
-  // Create message object
-  const message = {
-    id: Date.now(),
-    content: data.content,
-    sender: socket.id,
-    senderName: participant.name,
-    timestamp: new Date()
-  };
-
-  // Store message
-  session.messages.push(message);
-
-  // Broadcast to all participants
-  io.to(sessionId).emit('message', message);
-
-  // Check for intervention triggers
-  const intervention = checkInterventionTriggers(sessionId, message);
-  
-  if (intervention) {
-    // Send intervention message
-    setTimeout(() => {
-      const interventionMessage = {
-        id: Date.now(),
-        content: intervention.message,
-        sender: 'sage',
-        senderName: 'Sage',
-        timestamp: new Date(),
-        type: 'interruption'
-      };
-
-      session.messages.push(interventionMessage);
-      io.to(sessionId).emit('message', interventionMessage);
-    }, 1000);
-  } else {
-    // Normal Sage response
-    setTimeout(async () => {
-      const sageResponse = await getSageResponse(message, sessionId, session.messages);
-      
-      const responseMessage = {
-        id: Date.now(),
-        content: sageResponse,
-        sender: 'sage',
-        senderName: 'Sage',
-        timestamp: new Date()
-      };
-
-      session.messages.push(responseMessage);
-      io.to(sessionId).emit('message', responseMessage);
-    }, 2000 + Math.random() * 3000);
-  }
-});
+    // Create message object
+    const message = {
+      id: Date.now(),
+      content: data.content,
+      sender: socket.id,
+      senderName: participant.name,
+      timestamp: new Date()
     };
 
     // Store message
@@ -494,13 +405,19 @@ socket.on('join-session', (data) => {
       const session = sessions.get(sessionId);
       if (session) {
         // Remove participant
+        const disconnectedParticipant = session.participants.find(p => p.id === socket.id);
         session.participants = session.participants.filter(p => p.id !== socket.id);
         
-        // Notify remaining participants
+        // Update participant count for remaining users
         if (session.participants.length > 0) {
+          io.to(sessionId).emit('participant-count-updated', {
+            count: session.participants.length,
+            participants: session.participants.map(p => p.name)
+          });
+          
           const disconnectMessage = {
             id: Date.now(),
-            content: 'Your partner has disconnected.',
+            content: `${disconnectedParticipant?.name || 'A participant'} has disconnected.`,
             sender: 'system',
             senderName: 'System',
             timestamp: new Date()
@@ -520,7 +437,7 @@ socket.on('join-session', (data) => {
 });
 
 // Health check endpoint
-app.get('/', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'Couples Counseling Server Running',
     activeSessions: sessions.size,
@@ -533,8 +450,4 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🚀 Couples Counseling Server running on port ${PORT}`);
   console.log(`💕 Sage AI Counselor ready to help couples communicate better`);
-
 });
-
-
-
