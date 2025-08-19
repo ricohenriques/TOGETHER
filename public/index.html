@@ -472,7 +472,13 @@
         function initializeSocket() {
             console.log('Connecting to:', SERVER_URL);
             socket = io(SERVER_URL, {
-                transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    forceNew: false,
+    reconnection: true,
+    timeout: 5000,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    maxReconnectionAttempts:
             });
 
             socket.on('connect', () => {
@@ -824,6 +830,7 @@ socket.on('turn-released', () => {
      
 </body>
 </html>
+
 
 
 
